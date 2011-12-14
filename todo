@@ -1,0 +1,13 @@
+cleanup and encapsulate in modules/classes
+? use token totals, rather than item totals within categories for token probability
+? use fisher also/instead
+design api
+? riak as token store?
+
+tokenization
+  ? urls: break out host
+
+reading
+  http://www.paulgraham.com/naivebayes.html
+  http://www.paulgraham.com/spam.html
+  http://paulgraham.com/better.html
