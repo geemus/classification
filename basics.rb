@@ -12,8 +12,8 @@ def tokenize(string)
   tokens
 end
 
-def categorize(category, string)
-  tokenize(string).each do |token, count|
+def categorize(category, tokens)
+  tokens.each do |token, count|
     @categories_counts[category] += count
     @tokens_counts[token] += count
   end
@@ -54,6 +54,16 @@ end
 @categories_counts['bad'] = 1
 
 @tokens_counts['lorem'] = {'good' => 3, 'bad' => 1}
+
+# bad
+[
+  {}
+].each {|tokens| categorize('bad', tokens)
+
+# good
+[
+  {}
+].each {|tokens| categorize('good', tokens)
 
 strings = [
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce sodales consectetur purus in fermentum. Ut eu neque eu nisl aliquam ultricies. In sit amet metus id massa imperdiet euismod nec eget lacus. Praesent lacinia cursus arcu, vitae cursus velit euismod interdum. Aliquam ullamcorper ornare magna vitae vestibulum. Cras ac elit dui. Sed placerat commodo egestas. Nullam euismod iaculis sollicitudin. Quisque bibendum malesuada felis a feugiat. Nam ut justo diam, non elementum est. Ut aliquet nulla nulla. Pellentesque porttitor scelerisque vehicula.",
