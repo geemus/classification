@@ -13,8 +13,8 @@ def tokenize(string)
 end
 
 def categorize(category, string)
-  @categories_counts[category] += 1
   tokenize(string).each do |token, count|
+    @categories_counts[category] += count
     @tokens_counts[token] += count
   end
 end
@@ -22,13 +22,13 @@ end
 def probability(string, category)
   assumed_token_probability = 0.5
   probability = 1.0
-  items_in_category = @categories_counts[category].to_f
-  if items_in_category == 0.0
+  total_tokens_in_category = @categories_counts[category].to_f
+  if total_tokens_in_category == 0.0
     assumed_token_probability
   else
     tokenize(string).each do |token, count|
       tokens_in_category = @tokens_counts[token][category].to_f
-      token_probability = tokens_in_category / items_in_category
+      token_probability = tokens_in_category / total_tokens_in_category
 
       total = @tokens_counts[token].values.inject(0) {|sum, count| sum + count}.to_f
       weight = 1.0
