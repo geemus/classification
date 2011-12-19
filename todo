@@ -1,6 +1,8 @@
-cleanup and encapsulate in modules/classes
+persistence
+  ? postgres - http://stackoverflow.com/questions/4683057/simple-example-of-postgres-query-in-ruby
+design web api
+implement web api
 ? use fisher also/instead
-design api
 ? riak as token store?
 
 tokenization
