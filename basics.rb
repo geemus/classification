@@ -15,20 +15,20 @@ end
 class Category
   ASSUMED = 0.5
 
-  @categories = []
+  @categories = {}
+
+  def self.[](category)
+    @categories[category] ||= Category.new(category)
+  end
 
   def self.categories
     @categories
   end
 
-  def self.categories=(new_categories)
-    @categories = new_categories
-  end
-
   def self.match(tokens)
     probabilities = {}
-    @categories.each do |category|
-      probabilities[category.name] = category.match(tokens)
+    @categories.each do |name, category|
+      probabilities[name] = category.match(tokens)
     end
     probabilities
   end
@@ -47,7 +47,6 @@ class Category
 
   def initialize(name)
     @name, @tokens, @total = name, Hash.new(0.0), 0.0
-    Category.categories |= [self]
   end
 
   def match(tokens)
@@ -77,17 +76,14 @@ class Category
   end
 end
 
-bad = Category.new('bad')
-[
-  {'money' => 1}
-].each {|tokens| bad.update(tokens)}
-
-
-good = Category.new('good')
-[
-  {}
-].each {|tokens| good.update(tokens)}
-
-p Category.match('money' => 1)
-p bad.match('money' => 1)
-p good.match('money' => 1)
+#[
+#  {'money' => 1}
+#].each {|tokens| Category['bad'].update(tokens)}
+#
+#[
+#  {}
+#].each {|tokens| Category['good'].update(tokens)}
+#
+#p Category.match('money' => 1)
+#p Category['bad'].match('money' => 1)
+#p Category['good'].match('money' => 1)
