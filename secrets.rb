@@ -25,13 +25,13 @@ class Secrets < Sinatra::Base
 
   # delete a category
   delete('/categories/:category') do |category|
-    status(200)
-    body(Category.categories.delete(category))
+    Category.delete(category)
+    status(204)
   end
 
   # find probability of a set of tokens matching category
   # 200 - success
-  post('categories/:category') do |category|
+  post('/categories/:category') do |category|
     tokens = JSON.parse(request.body.read)
 
     status(200)
@@ -39,7 +39,7 @@ class Secrets < Sinatra::Base
   end
 
   # update token counts in a category (create category if it doesn't exist)
-  # 200 - tokens updated
+  # 204 - tokens updated
   put('/categories/:category') do |category|
     tokens = JSON.parse(request.body.read)
     Category[category].update(tokens)

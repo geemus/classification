@@ -25,6 +25,13 @@ class Category
     @categories
   end
 
+  def self.delete(category)
+    @categories.delete(category).tokens.each do |key, count|
+      @tokens[key] -= count
+    end
+    true
+  end
+
   def self.match(tokens)
     probabilities = {}
     @categories.each do |name, category|
@@ -43,22 +50,22 @@ class Category
     @tokens = new_tokens
   end
 
-  attr_accessor :name
+  attr_accessor :name, :tokens, :total
 
   def initialize(name)
-    @name, @tokens, @total = name, Hash.new(0.0), 0.0
+    @name, @tokens, @total_category_tokens = name, Hash.new(0.0), 0.0
   end
 
   def match(tokens)
-    if @total == 0.0
+    if @total_category_tokens == 0.0
       probability = ASSUMED
     else
       probability = 1.0
       tokens.each do |token, count|
-        total = self.class.tokens[token]
-        conditional = @tokens[token] / @total
+        total_tokens = self.class.tokens[token]
+        conditional = @tokens[token] / @total_category_tokens
 
-        weighted = (total * conditional + 1.0 * ASSUMED) / (total + 1)
+        weighted = (total_tokens * conditional + 1.0 * ASSUMED) / (total_tokens + 1)
         count.times do
           probability *= weighted
         end
@@ -71,7 +78,7 @@ class Category
     tokens.each do |token, count|
       Category.tokens[token] += count
       @tokens[token] += count
-      @total += count
+      @total_category_tokens += count
     end
   end
 end
