@@ -1,12 +1,14 @@
-require "#{File.dirname(__FILE__)}/../secrets"
+require "#{File.dirname(__FILE__)}/../classification"
 require 'test/unit'
 require 'rack/test'
 
-class SecretsTest < Test::Unit::TestCase
+ENV['RACK_ENV'] = 'test'
+
+class ClassificationTests < Test::Unit::TestCase
   include Rack::Test::Methods
 
   def app
-    Secrets.new
+    Classification.new
   end
 
   def setup
@@ -21,50 +23,50 @@ class SecretsTest < Test::Unit::TestCase
   end
 
   def test_update_new_category
-    response = put('/categories/bad', {'foo' => 1}.to_json)
+    response = put('/categories/good', {'foo' => 1}.to_json)
 
     assert_equal(204, response.status)
     assert_equal('', response.body)
 
-    delete('/categories/bad')
+    delete('/categories/good')
   end
 
   def test_update_existing_category
-    put('/categories/bad', {'foo' => 1}.to_json)
-    response = put('/categories/bad', {'bar' => 1}.to_json)
+    put('/categories/good', {'foo' => 1}.to_json)
+    response = put('/categories/good', {'bar' => 1}.to_json)
 
     assert_equal(204, response.status)
     assert_equal('', response.body)
 
-    delete('/categories/bad')
+    delete('/categories/good')
   end
 
   def test_delete_category
-    put('/categories/bad', {'foo' => 1}.to_json)
-    response = delete('/categories/bad')
+    put('/categories/good', {'foo' => 1}.to_json)
+    response = delete('/categories/good')
 
     assert_equal(204, response.status)
     assert_equal('', response.body)
   end
 
-  def test_categorize
-    put('/categories/bad', {'foo' => 1}.to_json)
-    response = post('/categories', {'foo' => 1}.to_json)
+#  def test_categorize
+#    put('/categories/good', {'foo' => 1}.to_json)
+#    response = post('/categories', {'foo' => 1}.to_json)
+#
+#    assert_equal(200, response.status)
+#    assert_equal({'good' => 0.75}, JSON.parse(response.body))
+#
+#    delete('/categories/good')
+#  end
 
-    assert_equal(200, response.status)
-    assert_equal({'bad' => 0.75}, JSON.parse(response.body))
-
-    delete('/categories/bad')
-  end
-
-  def test_match
-    put('/categories/bad', {'foo' => 1}.to_json)
-    response = post('/categories/bad', {'foo' => 1}.to_json)
-
-    assert_equal(200, response.status)
-    assert_equal({'bad' => 0.75}, JSON.parse(response.body))
-
-    delete('/categories/bad')
-  end
+#  def test_match
+#    put('/categories', {'foo' => 1}.to_json)
+#    response = post('/categories/good', {'foo' => 1}.to_json)
+#
+#    assert_equal(200, response.status)
+#    assert_equal({'good' => 0.75}, JSON.parse(response.body))
+#
+#    delete('/categories/good')
+#  end
 
 end

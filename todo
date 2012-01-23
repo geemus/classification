@@ -1,4 +1,9 @@
-persistence - dynamodb
+finish persistence - dynamodb
+dynamodb operations (especially delete/put) should be queue/worker based
+rescue failed writes/create non-existent tables for new categories
+
+change to development/test/etc databases (ie classification:development:good) or something
+  (note that shorter is probably faster, so perhaps some kind of shorthand, ie c:d:good)
 
 =====
 
