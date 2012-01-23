@@ -1,3 +1,7 @@
+persistence - dynamodb
+
+=====
+
 persistence - postgres
   postgres - http://stackoverflow.com/questions/4683057/simple-example-of-postgres-query-in-ruby
   setup
