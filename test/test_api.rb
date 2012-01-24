@@ -59,12 +59,12 @@ class ClassificationTests < Test::Unit::TestCase
 #    delete('/categories/good')
 #  end
 
-#  def test_match
-#    put('/categories', {'foo' => 1}.to_json)
-#    response = post('/categories/good', {'foo' => 1}.to_json)
+# def test_match
+#   put('/categories/good', {'foo' => 1}.to_json)
+#   response = post('/categories/good', {'foo' => 1}.to_json)
 #
-#    assert_equal(200, response.status)
-#    assert_equal({'good' => 0.75}, JSON.parse(response.body))
+#   assert_equal(200, response.status)
+#   assert_equal({'good' => 0.75}, JSON.parse(response.body))
 #
 #    delete('/categories/good')
 #  end

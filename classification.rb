@@ -67,7 +67,7 @@ class Classification < Sinatra::Base
       tokens = JSON.parse(request.body.read)
       # atomically update each token's count
       tokens.each do |token, count|
-        Fog::AWS[:dynamodb].update_item(
+        ddb.update_item(
           table,
           {
             'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
@@ -78,16 +78,17 @@ class Classification < Sinatra::Base
       end
       # update the total tokens in the category
       total = tokens.values.reduce(:+)
-      Fog::AWS[:dynamodb].update_item(
+      ddb.update_item(
         table,
         {
           'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
           'RangeKeyElement' => { 'S' => 'TOTAL' }
         },
-        { 'count' => { 'Value' => { 'N' => total }, 'Action' => 'ADD' } }
+        { 'count' => { 'Value' => { 'N' => total.to_s }, 'Action' => 'ADD' } }
       )
-    rescue Excon::Errors::BadRequest => error
-      if error.response.body['message'] == "Requested resource not found"
+    #rescue Excon::Errors::BadRequest => error
+    rescue => error
+      if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
         # table does not exist, so create it
         ddb.create_table(
           table,
@@ -100,6 +101,7 @@ class Classification < Sinatra::Base
         # wait for table to be ready
         Fog.wait_for { ddb.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
         # everything should now be ready to retry and add the tokens
+        request.body.rewind
         retry
       end
     end

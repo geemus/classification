@@ -1,6 +1,6 @@
 GIT
   remote: git://github.com/fog/fog.git
-  revision: 7d29e09d11536b817534cab332d1857d40481664
+  revision: 08b18cd514ee6c216b7d97624d1825f6a94b0ddb
   specs:
     fog (1.1.2)
       builder
