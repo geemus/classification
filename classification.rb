@@ -43,9 +43,13 @@ class Classification < Sinatra::Base
       # request delete
       ddb.delete_table(table)
       # wait for delete to finish
-      Fog.wait_for { !ddb.list_tables.include?(table) }
-    rescue(Excon::Errors::BadRequest)
-      # ignore errors, if for instance the table does not already exist
+      Fog.wait_for { !ddb.list_tables.body['TableNames'].include?(table) }
+    rescue Excon::Errors::BadRequest => error
+      if error.response.body =~ /Requested resource not found/
+        # ignore errors, if for instance the table does not already exist
+      else
+        raise(error)
+      end
     end
     status(204)
   end
