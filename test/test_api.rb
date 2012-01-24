@@ -19,29 +19,29 @@ class ClassificationTests < Test::Unit::TestCase
     put('/categories/category', {'token' => 1}.to_json)
     response = delete('/categories/category')
 
-    assert_equal(204, response.status)
     assert_equal('', response.body)
+    assert_equal(204, response.status)
   end
 
   def test_delete_noncategory
     response = delete('/categories/noncategory')
 
-    assert_equal(204, response.status)
     assert_equal('', response.body)
+    assert_equal(204, response.status)
   end
 
   def test_list_categories
     response = get('/categories')
 
-    assert_equal(200, response.status)
     assert_equal([], JSON.parse(response.body))
+    assert_equal(200, response.status)
   end
 
   def test_update_new_category
     response = put('/categories/category', {'token' => 1}.to_json)
 
-    assert_equal(204, response.status)
     assert_equal('', response.body)
+    assert_equal(204, response.status)
 
     delete('/categories/category')
   end
@@ -50,8 +50,8 @@ class ClassificationTests < Test::Unit::TestCase
     put('/categories/category', {'token' => 1}.to_json)
     response = put('/categories/category', {'other_token' => 1}.to_json)
 
-    assert_equal(204, response.status)
     assert_equal('', response.body)
+    assert_equal(204, response.status)
 
     delete('/categories/category')
   end
@@ -60,8 +60,8 @@ class ClassificationTests < Test::Unit::TestCase
 #    put('/categories/category', {'token' => 1}.to_json)
 #    response = post('/categories', {'token' => 1}.to_json)
 #
-#    assert_equal(200, response.status)
 #    assert_equal({'category' => 0.75}, JSON.parse(response.body))
+#    assert_equal(200, response.status)
 #
 #    delete('/categories/category')
 #  end
@@ -70,8 +70,8 @@ class ClassificationTests < Test::Unit::TestCase
     put('/categories/category', {'token' => 1}.to_json)
     response = post('/categories/category', {'token' => 1}.to_json)
 
-    assert_equal(200, response.status)
     assert_equal({'category' => 0.75}, JSON.parse(response.body))
+    assert_equal(200, response.status)
 
     delete('/categories/category')
   end
