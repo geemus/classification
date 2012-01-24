@@ -56,12 +56,54 @@ class Classification < Sinatra::Base
 
   # find probability of a set of tokens matching category
   # 200 - success
-#  post('/categories/:category') do |category|
-#    tokens = JSON.parse(request.body.read)
-#
-#    status(200)
-#    body({category => Category[category].match(tokens)}.to_json)
-#  end
+  post('/categories/:category') do |category|
+    table = table_for_category(category)
+    tokens = JSON.parse(request.body.read)
+
+    total = ddb.batch_get_item({
+      table => {
+        'Keys' => [
+          {
+            'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
+            'RangeKeyElement' => { 'S' => 'TOTAL' }
+          }
+        ]
+      }
+    }).body['Responses'][table]['Items'].first['count']['N'].to_f
+
+    token_data = ddb.batch_get_item({
+      table => {
+        'Keys' => tokens.map do |token, _|
+          {
+            'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
+            'RangeKeyElement' => { 'S' => token }
+          }
+        end
+      }
+    }).body
+
+    category_tokens = Hash.new(0.0)
+    token_data['Responses'][table]['Items'].each do |item|
+      category_tokens[item['token']['S']] = item['count']['N'].to_f
+    end
+
+    assumed = 0.5
+    if total == 0
+      probability = assumed
+    else
+      probability = 1.0
+      tokens.each do |token, count|
+        conditional = category_tokens[token] / total
+        weighted = (total * conditional + assumed) / (total + 1)
+        count.times do
+          probability *= weighted
+        end
+      end
+    end
+
+    status(200)
+    body({category => probability}.to_json)
+  end
 
   # update token counts in a category (create category if it doesn't exist)
   # 204 - tokens updated
