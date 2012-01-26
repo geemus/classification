@@ -78,15 +78,15 @@ class ClassificationTests < Test::Unit::TestCase
     delete('/categories/category')
   end
 
-#  def test_categorize
-#    put('/categories/category', {'token' => 1}.to_json)
-#    response = post('/categories', {'token' => 1}.to_json)
-#
-#    assert_equal({'category' => 0.75}, JSON.parse(response.body))
-#    assert_equal(200, response.status)
-#
-#    delete('/categories/category')
-#  end
+  def test_categorize
+    put('/categories/category', {'token' => 1}.to_json)
+    response = post('/categories', {'token' => 1}.to_json)
+
+    assert_equal({'category' => 0.75}, JSON.parse(response.body))
+    assert_equal(200, response.status)
+
+    delete('/categories/category')
+  end
 
   def test_match
     put('/categories/category', {'token' => 1}.to_json)

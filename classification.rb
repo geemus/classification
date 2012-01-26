@@ -26,21 +26,52 @@ class Classification < Sinatra::Base
   end
 
   # categorize a set of tokens
-#  post('/categories') do
-#    tokens = JSON.parse(request.body.read)
-#
-#    status(200)
-#    body(Category.match(tokens).to_json)
-#  end
+  post('/categories') do
+    tokens = JSON.parse(request.body.read)
+
+    categories_data = ddb.batch_get_item({
+      TOTAL_TABLE => {
+        'Keys' => [
+          {
+            'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
+            'RangeKeyElement' => { 'S' => TOTAL }
+          }
+        ]
+      }
+    }).body
+
+    categories = categories_data['Responses'][TOTAL_TABLE]['Items'].first['categories']['SS']
+
+    probabilities = {}
+    categories.each do |category|
+      probabilities[category] = get_probability(category, 'geemus@gmail.com', tokens)
+    end
+
+    status(200)
+    body(probabilities.to_json)
+  end
 
   # delete a category
   delete('/categories/:category') do |category|
     begin
       table = table_for_category(category)
+
       # request delete
       ddb.delete_table(table)
+
+      # remove category from list in TOTAL_TABLE
+      ddb.update_item(
+        TOTAL_TABLE,
+        {
+          'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
+          'RangeKeyElement' => { 'S' => TOTAL }
+        },
+        { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'DELETE' } }
+      )
+
       # wait for delete to finish
       Fog.wait_for { !ddb.list_tables.body['TableNames'].include?(table) }
+
     rescue Excon::Errors::BadRequest => error
       if error.response.body =~ /Requested resource not found/
         # ignore errors, if for instance the table does not already exist
@@ -48,6 +79,7 @@ class Classification < Sinatra::Base
         raise(error)
       end
     end
+
     status(204)
   end
 
@@ -66,17 +98,17 @@ class Classification < Sinatra::Base
   # 204 - tokens updated
   put('/categories/:category') do |category|
     table = table_for_category(category)
-
-    # atomically update each token's count
     tokens = JSON.parse(request.body.read)
-    tokens.each do |token, count|
-      increment_token_count(table, 'geemus@gmail.com', token, count)
-    end
 
     # update the total tokens in the category
     total = tokens.values.reduce(:+)
     increment_token_count(TOTAL_TABLE, 'geemus@gmail.com', category, total)
     increment_token_count(TOTAL_TABLE, 'geemus@gmail.com', TOTAL, total)
+
+    # atomically update each token's count
+    tokens.each do |token, count|
+      increment_token_count(table, 'geemus@gmail.com', token, count)
+    end
 
     status(204)
   end
@@ -154,8 +186,22 @@ class Classification < Sinatra::Base
           },
           { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
         )
+
+        unless table == TOTAL_TABLE
+          # add category to list in TOTAL_TABLE
+          ddb.update_item(
+            TOTAL_TABLE,
+            {
+              'HashKeyElement'  => { 'S' => user },
+              'RangeKeyElement' => { 'S' => TOTAL }
+            },
+            { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
+          )
+        end
+
         # wait for table to be ready
         Fog.wait_for { ddb.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
+
         # everything should now be ready to retry and add the tokens
         retry
       else
