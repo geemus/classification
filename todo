@@ -6,6 +6,8 @@ post /categories/category
 change to development/test/etc databases (ie classification:development:good) or something
   (note that shorter is probably faster, so perhaps some kind of shorthand, ie c:d:good)
 
+? change heroku-app to have x-staging and x-production for parity with hud
+
 =====
 
 Beyond rss feeds... activity/status feeds (facebook, github, twitter)
