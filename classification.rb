@@ -6,19 +6,16 @@ require "#{File.dirname(__FILE__)}/basics"
 
 class Classification < Sinatra::Base
 
+  TOTAL = '__TOTAL__'
+  TOTAL_TABLE = ['classification', ENV['RACK_ENV'], TOTAL].join('.')
+
+  configure :development, :test do
+    enable :dump_error  end
+
+  enable :logging
+
   use Rack::Auth::Basic do |username, password|
     password == '25cf3e8f7e5adea77e023ffba89e203b1c0c33eb'
-  end
-
-  def ddb
-    Fog::AWS::DynamoDB.new(
-      :aws_access_key_id      => ENV['AWS_ACCESS_KEY_ID'],
-      :aws_secret_access_key  => ENV['AWS_SECRET_ACCESS_KEY']
-    )
-  end
-
-  def table_for_category(category)
-    ['classification', ENV['RACK_ENV'], category].join('.')
   end
 
   # get a list of categories
@@ -57,23 +54,69 @@ class Classification < Sinatra::Base
   # find probability of a set of tokens matching category
   # 200 - success
   post('/categories/:category') do |category|
-    table = table_for_category(category)
     tokens = JSON.parse(request.body.read)
 
-    total = ddb.batch_get_item({
-      table => {
-        'Keys' => [
-          {
-            'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
-            'RangeKeyElement' => { 'S' => 'TOTAL' }
-          }
-        ]
-      }
-    }).body['Responses'][table]['Items'].first['count']['N'].to_f
+    probability = get_probability(category, 'geemus@gmail.com', tokens)
 
+    status(200)
+    body({category => probability}.to_json)
+  end
+
+  # update token counts in a category (create category if it doesn't exist)
+  # 204 - tokens updated
+  put('/categories/:category') do |category|
+    table = table_for_category(category)
+
+    # atomically update each token's count
+    tokens = JSON.parse(request.body.read)
+    tokens.each do |token, count|
+      increment_token_count(table, 'geemus@gmail.com', token, count)
+    end
+
+    # update the total tokens in the category
+    total = tokens.values.reduce(:+)
+    increment_token_count(TOTAL_TABLE, 'geemus@gmail.com', category, total)
+    increment_token_count(TOTAL_TABLE, 'geemus@gmail.com', TOTAL, total)
+
+    status(204)
+  end
+
+  private
+
+  def ddb
+    Fog::AWS::DynamoDB.new(
+      :aws_access_key_id      => ENV['AWS_ACCESS_KEY_ID'],
+      :aws_secret_access_key  => ENV['AWS_SECRET_ACCESS_KEY']
+    )
+  end
+
+  def get_probability(category, user, tokens)
+    category_total = get_category_tokens(TOTAL_TABLE, 'geemus@gmail.com', category)[category]
+    total_total = get_category_tokens(TOTAL_TABLE, 'geemus@gmail.com', TOTAL)[TOTAL]
+
+    category_tokens = get_category_tokens(table_for_category(category), 'geemus@gmail.com', tokens.keys)
+
+    assumed = 0.5
+    if category_total == 0
+      probability = assumed
+    else
+      probability = 1.0
+      tokens.each do |token, count|
+        conditional = category_tokens[token] / category_total
+        weighted = (total_total * conditional + assumed) / (total_total + 1)
+        count.times do
+          probability *= weighted
+        end
+      end
+    end
+
+    probability
+  end
+
+  def get_category_tokens(table, user, tokens)
     token_data = ddb.batch_get_item({
       table => {
-        'Keys' => tokens.map do |token, _|
+        'Keys' => [*tokens].map do |token|
           {
             'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
             'RangeKeyElement' => { 'S' => token }
@@ -87,53 +130,20 @@ class Classification < Sinatra::Base
       category_tokens[item['token']['S']] = item['count']['N'].to_f
     end
 
-    assumed = 0.5
-    if total == 0
-      probability = assumed
-    else
-      probability = 1.0
-      tokens.each do |token, count|
-        conditional = category_tokens[token] / total
-        weighted = (total * conditional + assumed) / (total + 1)
-        count.times do
-          probability *= weighted
-        end
-      end
-    end
-
-    status(200)
-    body({category => probability}.to_json)
+    category_tokens
   end
 
-  # update token counts in a category (create category if it doesn't exist)
-  # 204 - tokens updated
-  put('/categories/:category') do |category|
+  def increment_token_count(table, user, token, value)
     begin
-      table = table_for_category(category)
-      tokens = JSON.parse(request.body.read)
-      # atomically update each token's count
-      tokens.each do |token, count|
-        ddb.update_item(
-          table,
-          {
-            'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
-            'RangeKeyElement' => { 'S' => token }
-          },
-          { 'count' => { 'Value' => { 'N' => count.to_s }, 'Action' => 'ADD' } }
-        )
-      end
-      # update the total tokens in the category
-      total = tokens.values.reduce(:+)
       ddb.update_item(
         table,
         {
-          'HashKeyElement'  => { 'S' => 'geemus@gmail.com' },
-          'RangeKeyElement' => { 'S' => 'TOTAL' }
+          'HashKeyElement'  => { 'S' => user },
+          'RangeKeyElement' => { 'S' => token }
         },
-        { 'count' => { 'Value' => { 'N' => total.to_s }, 'Action' => 'ADD' } }
+        { 'count' => { 'Value' => { 'N' => value.to_s }, 'Action' => 'ADD' } }
       )
-    #rescue Excon::Errors::BadRequest => error
-    rescue => error
+    rescue Excon::Errors::BadRequest => error
       if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
         # table does not exist, so create it
         ddb.create_table(
@@ -147,11 +157,15 @@ class Classification < Sinatra::Base
         # wait for table to be ready
         Fog.wait_for { ddb.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
         # everything should now be ready to retry and add the tokens
-        request.body.rewind
         retry
+      else
+        raise(error)
       end
     end
-    status(204)
+  end
+
+  def table_for_category(category)
+    ['classification', ENV['RACK_ENV'], category].join('.')
   end
 
 end

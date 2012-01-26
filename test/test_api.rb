@@ -1,8 +1,8 @@
+ENV['RACK_ENV'] = 'test'
+
 require "#{File.dirname(__FILE__)}/../classification"
 require 'test/unit'
 require 'rack/test'
-
-ENV['RACK_ENV'] = 'test'
 
 class ClassificationTests < Test::Unit::TestCase
   include Rack::Test::Methods
@@ -11,8 +11,30 @@ class ClassificationTests < Test::Unit::TestCase
     Classification.new
   end
 
+  def ddb
+    Fog::AWS::DynamoDB.new(
+      :aws_access_key_id      => ENV['AWS_ACCESS_KEY_ID'],
+      :aws_secret_access_key  => ENV['AWS_SECRET_ACCESS_KEY']
+    )
+  end
+
   def setup
     authorize('', '25cf3e8f7e5adea77e023ffba89e203b1c0c33eb')
+  end
+
+  def teardown
+    # cleanup TOTAL_TABLE, if it exists
+    begin
+      ddb.delete_table(Classification::TOTAL_TABLE)
+      # wait for delete to finish
+      Fog.wait_for { !ddb.list_tables.body['TableNames'].include?(Classification::TOTAL_TABLE) }
+    rescue Excon::Errors::BadRequest => error
+      if error.response.body =~ /Requested resource not found/
+        # ignore errors, if for instance the table does not already exist
+      else
+        raise(error)
+      end
+    end
   end
 
   def test_delete_category
