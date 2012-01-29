@@ -19,7 +19,7 @@ class ClassificationTests < Test::Unit::TestCase
   end
 
   def setup
-    authorize('', '25cf3e8f7e5adea77e023ffba89e203b1c0c33eb')
+    authorize('geemus@gmail.com', '25cf3e8f7e5adea77e023ffba89e203b1c0c33eb')
   end
 
   def teardown

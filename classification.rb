@@ -9,10 +9,9 @@ class Classification < Sinatra::Base
   TOTAL = '__TOTAL__'
   TOTAL_TABLE = ['classification', ENV['RACK_ENV'], TOTAL].join('.')
 
-  USER = 'geemus@gmail.com'
-
   configure :development, :test do
-    enable :dump_error  end
+    enable :dump_error
+  end
 
   enable :logging
 
@@ -35,7 +34,7 @@ class Classification < Sinatra::Base
       TOTAL_TABLE => {
         'Keys' => [
           {
-            'HashKeyElement'  => { 'S' => USER },
+            'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
             'RangeKeyElement' => { 'S' => TOTAL }
           }
         ]
@@ -46,7 +45,7 @@ class Classification < Sinatra::Base
 
     probabilities = {}
     categories.each do |category|
-      probabilities[category] = get_probability(category, USER, tokens)
+      probabilities[category] = get_probability(category, tokens)
     end
 
     status(200)
@@ -65,7 +64,7 @@ class Classification < Sinatra::Base
       ddb.update_item(
         TOTAL_TABLE,
         {
-          'HashKeyElement'  => { 'S' => USER },
+          'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
           'RangeKeyElement' => { 'S' => TOTAL }
         },
         { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'DELETE' } }
@@ -90,7 +89,7 @@ class Classification < Sinatra::Base
   post('/categories/:category') do |category|
     tokens = JSON.parse(request.body.read)
 
-    probability = get_probability(category, USER, tokens)
+    probability = get_probability(category, tokens)
 
     status(200)
     body({category => probability}.to_json)
@@ -104,12 +103,12 @@ class Classification < Sinatra::Base
 
     # update the total tokens in the category
     total = tokens.values.reduce(:+)
-    increment_token_count(TOTAL_TABLE, USER, category, total)
-    increment_token_count(TOTAL_TABLE, USER, TOTAL, total)
+    increment_token_count(TOTAL_TABLE, category, total)
+    increment_token_count(TOTAL_TABLE, TOTAL, total)
 
     # atomically update each token's count
     tokens.each do |token, count|
-      increment_token_count(table, USER, token, count)
+      increment_token_count(table, token, count)
     end
 
     status(204)
@@ -124,11 +123,11 @@ class Classification < Sinatra::Base
     )
   end
 
-  def get_probability(category, user, tokens)
-    category_total = get_category_tokens(TOTAL_TABLE, user, category)[category]
-    total_total = get_category_tokens(TOTAL_TABLE, user, TOTAL)[TOTAL]
+  def get_probability(category, tokens)
+    category_total = get_category_tokens(TOTAL_TABLE, category)[category]
+    total_total = get_category_tokens(TOTAL_TABLE, TOTAL)[TOTAL]
 
-    category_tokens = get_category_tokens(table_for_category(category), user, tokens.keys)
+    category_tokens = get_category_tokens(table_for_category(category), tokens.keys)
 
     assumed = 0.5
     if category_total == 0
@@ -147,12 +146,12 @@ class Classification < Sinatra::Base
     probability
   end
 
-  def get_category_tokens(table, user, tokens)
+  def get_category_tokens(table, tokens)
     token_data = ddb.batch_get_item({
       table => {
         'Keys' => [*tokens].map do |token|
           {
-            'HashKeyElement'  => { 'S' => user },
+            'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
             'RangeKeyElement' => { 'S' => token }
           }
         end
@@ -167,12 +166,12 @@ class Classification < Sinatra::Base
     category_tokens
   end
 
-  def increment_token_count(table, user, token, value)
+  def increment_token_count(table, token, value)
     begin
       ddb.update_item(
         table,
         {
-          'HashKeyElement'  => { 'S' => user },
+          'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
           'RangeKeyElement' => { 'S' => token }
         },
         { 'count' => { 'Value' => { 'N' => value.to_s }, 'Action' => 'ADD' } }
@@ -194,7 +193,7 @@ class Classification < Sinatra::Base
           ddb.update_item(
             TOTAL_TABLE,
             {
-              'HashKeyElement'  => { 'S' => user },
+              'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
               'RangeKeyElement' => { 'S' => TOTAL }
             },
             { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
