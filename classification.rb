@@ -140,7 +140,9 @@ class Classification < Sinatra::Base
         # TODO: in the mean time, total_total can == category_total since there is only one category
         #weighted = (total_total * conditional + assumed) / (total_total + 1)
         weighted = (category_tokens[token] * conditional + assumed) / (category_tokens[token] + 1)
-        probability *= weighted
+        count.times do
+          probability *= weighted
+        end
       end
     end
 
