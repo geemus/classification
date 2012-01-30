@@ -123,7 +123,7 @@ class Classification < Sinatra::Base
   end
 
   def get_probability(category, tokens)
-    category_total = get_category_tokens(TOTAL_TABLE, category)[category]
+    category_total = get_category_tokens(TOTAL_TABLE, category)[category] || 0
     # total_total == category_total currently, and should be a read for a particular token across all categories
     #total_total = get_category_tokens(TOTAL_TABLE, TOTAL)[TOTAL]
 
@@ -183,6 +183,10 @@ class Classification < Sinatra::Base
     end
 
     category_tokens
+  rescue Excon::Errors::BadRequest => error
+    if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
+      {}
+    end
   end
 
   def increment_token_count(table, token, value)
