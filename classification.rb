@@ -104,7 +104,6 @@ class Classification < Sinatra::Base
     # update the total tokens in the category
     total = tokens.values.reduce(:+)
     increment_token_count(TOTAL_TABLE, category, total)
-    increment_token_count(TOTAL_TABLE, TOTAL, total)
 
     # atomically update each token's count
     tokens.each do |token, count|
@@ -125,7 +124,8 @@ class Classification < Sinatra::Base
 
   def get_probability(category, tokens)
     category_total = get_category_tokens(TOTAL_TABLE, category)[category]
-    total_total = get_category_tokens(TOTAL_TABLE, TOTAL)[TOTAL]
+    # total_total == category_total currently, and should be a read for a particular token across all categories
+    #total_total = get_category_tokens(TOTAL_TABLE, TOTAL)[TOTAL]
 
     category_tokens = get_category_tokens(table_for_category(category), tokens.keys)
 
@@ -136,10 +136,11 @@ class Classification < Sinatra::Base
       probability = 1.0
       tokens.each do |token, count|
         conditional = category_tokens[token] / category_total
-        weighted = (total_total * conditional + assumed) / (total_total + 1)
-        count.times do
-          probability *= weighted
-        end
+        # TODO: total_total should represent times this token appears in all categories (ie batch get with multiple tables), not a total items count
+        # TODO: in the mean time, total_total can == category_total since there is only one category
+        #weighted = (total_total * conditional + assumed) / (total_total + 1)
+        weighted = (category_tokens[token] * conditional + assumed) / (category_tokens[token] + 1)
+        probability *= weighted
       end
     end
 
