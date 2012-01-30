@@ -144,7 +144,25 @@ class Classification < Sinatra::Base
       end
     end
 
-    probability
+    # fisher
+    probability = -2.0 * Math.log(probability)
+
+    # inv chi
+    m = probability / 2.0
+    sum = term = Math.exp(-m)
+    1.upto(tokens.length) do |i|
+      term *= m / i
+      sum += term
+    end
+
+    if ENV['DEBUG_FISHER']
+      p category_tokens
+      p probability
+      p sum
+    end
+
+    sum = 0.0 if sum.nan?
+    [sum, 1.0].min
   end
 
   def get_category_tokens(table, tokens)
