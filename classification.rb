@@ -188,6 +188,8 @@ class Classification < Sinatra::Base
   rescue Excon::Errors::BadRequest => error
     if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
       {}
+    else
+      raise(error)
     end
   end
 
