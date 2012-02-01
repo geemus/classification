@@ -186,10 +186,13 @@ class Classification < Sinatra::Base
 
     category_tokens
   rescue Excon::Errors::BadRequest => error
-    if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
-      {}
-    else
-      raise(error)
+    if error.respond_to?(:response)
+      if error.response.body =~ /Requested resource not found/
+        {}
+      elsif error.response.body =~ /ProvisionedThroughputExceededException/
+        sleep(1)
+        retry
+      end
     end
   end
 
