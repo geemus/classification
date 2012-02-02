@@ -1,3 +1,3 @@
-require "#{File.dirname(__FILE__)}/classification"
+require "#{File.dirname(__FILE__)}/lib/classification"
 
-run Classification
+run Classification::Server

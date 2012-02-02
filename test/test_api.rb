@@ -1,14 +1,14 @@
 ENV['RACK_ENV'] = 'test'
 
-require "#{File.dirname(__FILE__)}/../classification"
+require "#{File.dirname(__FILE__)}/../lib/classification"
 require 'test/unit'
 require 'rack/test'
 
-class ClassificationTests < Test::Unit::TestCase
+class ClassificationServerTests < Test::Unit::TestCase
   include Rack::Test::Methods
 
   def app
-    Classification.new
+    Classification::Server.new
   end
 
   def ddb
@@ -25,9 +25,9 @@ class ClassificationTests < Test::Unit::TestCase
   def teardown
     # cleanup TOTAL_TABLE, if it exists
     begin
-      ddb.delete_table(Classification::TOTAL_TABLE)
+      ddb.delete_table(Classification::Server::TOTAL_TABLE)
       # wait for delete to finish
-      Fog.wait_for { !ddb.list_tables.body['TableNames'].include?(Classification::TOTAL_TABLE) }
+      Fog.wait_for { !ddb.list_tables.body['TableNames'].include?(Classification::Server::TOTAL_TABLE) }
     rescue Excon::Errors::BadRequest => error
       if error.response.body =~ /Requested resource not found/
         # ignore errors, if for instance the table does not already exist
