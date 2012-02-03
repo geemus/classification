@@ -203,42 +203,38 @@ module Classification
           { 'count' => { 'Value' => { 'N' => value.to_s }, 'Action' => 'ADD' } }
         )
       rescue Excon::Errors::BadRequest => error
-        if error.respond_to?(:response)
-          if error.response.body =~ /Requested resource not found/
-            # table does not exist, so create it
-            ddb.create_table(
-              table,
+        if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
+          # table does not exist, so create it
+          ddb.create_table(
+            table,
+            {
+              'HashKeyElement'  => { 'AttributeName' => 'user',  'AttributeType' => 'S' },
+              'RangeKeyElement' => { 'AttributeName' => 'token', 'AttributeType' => 'S' }
+            },
+            { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
+          )
+
+          unless table == TOTAL_TABLE
+            # add category to list in TOTAL_TABLE
+            ddb.update_item(
+              TOTAL_TABLE,
               {
-                'HashKeyElement'  => { 'AttributeName' => 'user',  'AttributeType' => 'S' },
-                'RangeKeyElement' => { 'AttributeName' => 'token', 'AttributeType' => 'S' }
+                'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
+                'RangeKeyElement' => { 'S' => TOTAL }
               },
-              { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
+              { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
             )
-
-            unless table == TOTAL_TABLE
-              # add category to list in TOTAL_TABLE
-              ddb.update_item(
-                TOTAL_TABLE,
-                {
-                  'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
-                  'RangeKeyElement' => { 'S' => TOTAL }
-                },
-                { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
-              )
-            end
-
-            # wait for table to be ready
-            Fog.wait_for { ddb.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
-
-            # everything should now be ready to retry and add the tokens
-            retry
-          elsif error.response.body =~ /ProvisionedThroughputExceededException/
-            logger.warn("Write capacity error for #{table}")
-            sleep(1)
-            retry
-          else
-            raise(error)
           end
+
+          # wait for table to be ready
+          Fog.wait_for { ddb.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
+
+          # everything should now be ready to retry and add the tokens
+          retry
+        elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
+          logger.warn("Write capacity error for #{table}")
+          sleep(1)
+          retry
         else
           raise(error)
         end
