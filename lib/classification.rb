@@ -7,6 +7,7 @@ unless $LOAD_PATH.include?(__LIB_DIR__)
   $LOAD_PATH.unshift(__LIB_DIR__)
 end
 
+require 'classification/ddb'
 require 'classification/server'
 
 module Classification

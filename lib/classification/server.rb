@@ -25,18 +25,9 @@ module Classification
     post('/categories') do
       tokens = JSON.parse(request.body.read)
 
-      categories_data = ddb.batch_get_item({
-        TOTAL_TABLE => {
-          'Keys' => [
-            {
-              'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
-              'RangeKeyElement' => { 'S' => TOTAL }
-            }
-          ]
-        }
-      }).body
+      categories_data = ddb2.get_items(TOTAL_TABLE, [TOTAL])
 
-      categories = categories_data['Responses'][TOTAL_TABLE]['Items'].first['categories']['SS']
+      categories = categories_data.first['categories']['SS']
 
       probabilities = {}
       categories.each do |category|
@@ -112,10 +103,11 @@ module Classification
     private
 
     def ddb
-      Fog::AWS::DynamoDB.new(
-        :aws_access_key_id      => ENV['AWS_ACCESS_KEY_ID'],
-        :aws_secret_access_key  => ENV['AWS_SECRET_ACCESS_KEY']
-      )
+      ddb2.instance_variable_get(:@connection)
+    end
+
+    def ddb2
+      Classification::DDB.new(env['REMOTE_USER'], logger)
     end
 
     def get_probability(category, tokens)
@@ -164,33 +156,14 @@ module Classification
     end
 
     def get_category_tokens(table, tokens)
-      token_data = ddb.batch_get_item({
-        table => {
-          'Keys' => [*tokens].map do |token|
-            {
-              'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
-              'RangeKeyElement' => { 'S' => token }
-            }
-          end
-        }
-      }).body
+      token_data = ddb2.get_items(table, tokens)
 
       category_tokens = Hash.new(0.0)
-      token_data['Responses'][table]['Items'].each do |item|
+      token_data.each do |item|
         category_tokens[item['token']['S']] = item['count']['N'].to_f
       end
 
       category_tokens
-    rescue Excon::Errors::BadRequest => error
-      if error.respond_to?(:response)
-        if error.response.body =~ /Requested resource not found/
-          {}
-        elsif error.response.body =~ /ProvisionedThroughputExceededException/
-          logger.warn("Read capacity error for #{table}")
-          sleep(1)
-          retry
-        end
-      end
     end
 
     def increment_token_count(table, token, value)
