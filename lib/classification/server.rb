@@ -52,6 +52,7 @@ module Classification
       begin
         table = table_for_category(category)
 
+        # TODO: this should query and delete keys for this user ONLY
         # request delete
         ddb.delete_table(table)
 
