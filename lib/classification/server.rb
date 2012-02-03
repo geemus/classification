@@ -16,9 +16,10 @@ module Classification
 
     # get a list of categories
     get('/categories') do
-      data = ddb.list_tables.body['TableNames']
+      categories_data = ddb2.get_items(TOTAL_TABLE, [TOTAL])
+      categories = categories_data.first['categories']['SS']
       status(200)
-      body(data.to_json)
+      body(categories.to_json)
     end
 
     # categorize a set of tokens
@@ -26,7 +27,6 @@ module Classification
       tokens = JSON.parse(request.body.read)
 
       categories_data = ddb2.get_items(TOTAL_TABLE, [TOTAL])
-
       categories = categories_data.first['categories']['SS']
 
       probabilities = {}
