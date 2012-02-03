@@ -1,9 +1,6 @@
 module Classification
   class Server < Sinatra::Base
 
-    TOTAL = '__TOTAL__'
-    TOTAL_TABLE = ['classification', ENV['RACK_ENV'], TOTAL].join('.')
-
     configure :development, :test do
       enable :dump_error
     end
@@ -16,8 +13,7 @@ module Classification
 
     # get a list of categories
     get('/categories') do
-      categories_data = ddb2.get_items(TOTAL_TABLE, [TOTAL])
-      categories = categories_data.first['categories']['SS']
+      categories = ddb2.get_categories
       status(200)
       body(categories.to_json)
     end
@@ -26,8 +22,7 @@ module Classification
     post('/categories') do
       tokens = JSON.parse(request.body.read)
 
-      categories_data = ddb2.get_items(TOTAL_TABLE, [TOTAL])
-      categories = categories_data.first['categories']['SS']
+      categories = ddb2.get_categories
 
       probabilities = {}
       categories.each do |category|
@@ -49,10 +44,10 @@ module Classification
 
         # remove category from list in TOTAL_TABLE
         ddb.update_item(
-          TOTAL_TABLE,
+          Classification::TOTAL_TABLE,
           {
             'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
-            'RangeKeyElement' => { 'S' => TOTAL }
+            'RangeKeyElement' => { 'S' => Classification::TOTAL }
           },
           { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'DELETE' } }
         )
@@ -90,7 +85,7 @@ module Classification
 
       # update the total tokens in the category
       total = tokens.values.reduce(:+)
-      increment_token_count(TOTAL_TABLE, category, total)
+      increment_token_count(Classification::TOTAL_TABLE, category, total)
 
       # atomically update each token's count
       tokens.each do |token, count|
@@ -107,11 +102,15 @@ module Classification
     end
 
     def ddb2
-      Classification::DDB.new(env['REMOTE_USER'], logger)
+      Classification::DDB.new(
+        :logger   => logger,
+        :username => env['REMOTE_USER']
+      )
     end
 
     def get_probability(category, tokens)
-      category_total = get_category_tokens(TOTAL_TABLE, category)[category] || 0
+      category_total = get_category_tokens(Classification::TOTAL_TABLE, category)[category] || 0
+      # TODO: should read totals across all categories for a single user
       # total_total == category_total currently, and should be a read for a particular token across all categories
       #total_total = get_category_tokens(TOTAL_TABLE, TOTAL)[TOTAL]
 
@@ -188,13 +187,13 @@ module Classification
             { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
           )
 
-          unless table == TOTAL_TABLE
+          unless table == Classification::TOTAL_TABLE
             # add category to list in TOTAL_TABLE
             ddb.update_item(
-              TOTAL_TABLE,
+              Classification::TOTAL_TABLE,
               {
                 'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
-                'RangeKeyElement' => { 'S' => TOTAL }
+                'RangeKeyElement' => { 'S' => Classification::TOTAL }
               },
               { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
             )

@@ -11,4 +11,8 @@ require 'classification/ddb'
 require 'classification/server'
 
 module Classification
+
+  TOTAL = '__TOTAL__'
+  TOTAL_TABLE = ['classification', ENV['RACK_ENV'], TOTAL].join('.')
+
 end
