@@ -23,11 +23,14 @@ class ClassificationServerTests < Test::Unit::TestCase
   end
 
   def teardown
-    # cleanup TOTAL_TABLE, if it exists
+    # cleanup leftover tables, if any exist
     begin
-      ddb.delete_table(Classification::TOTAL_TABLE)
+      tables_to_delete = ddb.list_tables.body['TableNames'].select {|table| table =~ /classification\.test\..*/}
+      tables_to_delete.each do |table|
+        ddb.delete_table(table)
+      end
       # wait for delete to finish
-      Fog.wait_for { !ddb.list_tables.body['TableNames'].include?(Classification::TOTAL_TABLE) }
+      Fog.wait_for { !ddb.list_tables.body['TableNames'].any? {|table| tables_to_delete.include?(table)} }
     rescue Excon::Errors::BadRequest => error
       if error.response.body =~ /Requested resource not found/
         # ignore errors, if for instance the table does not already exist
