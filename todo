@@ -1,3 +1,4 @@
+categories list should be in a separate table (META_TABLE perhaps?)
 dynamodb operations (especially delete/put) should be queue/worker based
 
 update get_probabability to better take into account proper item totals and multiple categories (see specific TODOs in file)

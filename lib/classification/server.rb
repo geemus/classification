@@ -83,14 +83,11 @@ module Classification
       table = table_for_category(category)
       tokens = JSON.parse(request.body.read)
 
-      # update the total tokens in the category
-      total = tokens.values.reduce(:+)
-      increment_token_count(Classification::TOTAL_TABLE, category, total)
-
       # atomically update each token's count
-      tokens.each do |token, count|
-        increment_token_count(table, token, count)
-      end
+      ddb.update_token_counts({
+        Classification::TOTAL_TABLE => { category => tokens.values.reduce(:+) },
+        table => tokens
+      })
 
       status(204)
     end
@@ -159,55 +156,6 @@ module Classification
       end
 
       category_tokens
-    end
-
-    def increment_token_count(table, token, value)
-      begin
-        ddb.connection.update_item(
-          table,
-          {
-            'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
-            'RangeKeyElement' => { 'S' => token }
-          },
-          { 'count' => { 'Value' => { 'N' => value.to_s }, 'Action' => 'ADD' } }
-        )
-      rescue Excon::Errors::BadRequest => error
-        if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
-          # table does not exist, so create it
-          ddb.connection.create_table(
-            table,
-            {
-              'HashKeyElement'  => { 'AttributeName' => 'user',  'AttributeType' => 'S' },
-              'RangeKeyElement' => { 'AttributeName' => 'token', 'AttributeType' => 'S' }
-            },
-            { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
-          )
-
-          unless table == Classification::TOTAL_TABLE
-            # add category to list in TOTAL_TABLE
-            ddb.connection.update_item(
-              Classification::TOTAL_TABLE,
-              {
-                'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
-                'RangeKeyElement' => { 'S' => Classification::TOTAL }
-              },
-              { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
-            )
-          end
-
-          # wait for table to be ready
-          Fog.wait_for { ddb.connection.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
-
-          # everything should now be ready to retry and add the tokens
-          retry
-        elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
-          logger.warn("Write capacity error for #{table}")
-          sleep(1)
-          retry
-        else
-          raise(error)
-        end
-      end
     end
 
     def table_for_category(category)

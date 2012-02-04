@@ -1,6 +1,6 @@
 ENV['RACK_ENV'] = 'test'
 
-require "#{File.dirname(__FILE__)}/../lib/classification"
+require './lib/classification'
 require 'test/unit'
 require 'rack/test'
 
