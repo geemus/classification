@@ -36,19 +36,19 @@ module Classification
     # delete a category
     delete('/categories/:category') do |category|
       begin
-        table = table_for_category(category)
+        table = ['classification', ENV['RACK_ENV'], category].join('.')
 
         # request delete
         ddb.connection.delete_table(table)
 
         # remove category from list in TOTAL_TABLE
         ddb.connection.update_item(
-          Classification::TOTAL_TABLE,
+          ['classification', ENV['RACK_ENV'], '__TOTAL__'].join('.'),
           {
             'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
-            'RangeKeyElement' => { 'S' => Classification::TOTAL_KEY }
+            'RangeKeyElement' => { 'S' => '__TOTAL__' }
           },
-          { Classification::CATEGORIES_KEY => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'DELETE' } }
+          { '__CATEGORIES__' => { 'Value' => { 'SS' => [category] }, 'Action' => 'DELETE' } }
         )
 
         # wait for delete to finish
@@ -79,12 +79,11 @@ module Classification
     # update token counts in a category (create category if it doesn't exist)
     # 204 - tokens updated
     put('/categories/:category') do |category|
-      table = table_for_category(category)
       tokens = JSON.parse(request.body.read)
 
       # atomically update each token's count
       ddb.update_token_counts({
-        table => tokens
+        category => tokens
       })
 
       status(204)
@@ -100,14 +99,12 @@ module Classification
     end
 
     def get_probability(category, tokens)
-      table = table_for_category(category)
-
-      category_total = get_category_tokens(Classification::TOTAL_TABLE, table)[table] || 0.0
+      category_total = get_category_tokens('__TOTAL__', "__#{category}__")["__#{category}__"] || 0.0
       # TODO: should read total count for a particular token across all categories for a single user
       # total_total == category_total currently, and should be a read for a particular token across all categories
       #total_total = get_category_tokens(TOTAL_TABLE, TOTAL)[TOTAL]
 
-      category_tokens = get_category_tokens(table_for_category(category), tokens.keys)
+      category_tokens = get_category_tokens(category, tokens.keys)
 
       assumed = 0.5
       if category_total == 0
@@ -147,8 +144,8 @@ module Classification
       [sum, 1.0].min
     end
 
-    def get_category_tokens(table, tokens)
-      token_data = ddb.get_items(table => tokens)[table]
+    def get_category_tokens(category, tokens)
+      token_data = ddb.get_items(category => tokens)[category]
 
       category_tokens = Hash.new(0.0)
       token_data.each do |item|
@@ -156,10 +153,6 @@ module Classification
       end
 
       category_tokens
-    end
-
-    def table_for_category(category)
-      ['classification', ENV['RACK_ENV'], category].join('.')
     end
 
   end

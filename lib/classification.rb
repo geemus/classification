@@ -11,9 +11,4 @@ require 'classification/ddb'
 require 'classification/server'
 
 module Classification
-
-  CATEGORIES_KEY  = '__CATEGORIES__'
-  TOTAL_KEY       = '__TOTAL__'
-  TOTAL_TABLE     = ['classification', ENV['RACK_ENV'], TOTAL_KEY].join('.')
-
 end

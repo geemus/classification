@@ -14,9 +14,9 @@ module Classification
 
     # gets a list of all categories for a user
     def get_categories
-      categories_data = self.get_items(Classification::TOTAL_TABLE => Classification::TOTAL_KEY)[Classification::TOTAL_TABLE]
-      categories = if categories_data.first && categories_data.first[Classification::CATEGORIES_KEY]
-        categories_data.first[Classification::CATEGORIES_KEY]['SS']
+      categories_data = self.get_items('__TOTAL__' => '__META__')['__TOTAL__']
+      categories = if categories_data.first && categories_data.first['__CATEGORIES__']
+        categories_data.first['__CATEGORIES__']['SS']
       else
         []
       end
@@ -27,9 +27,9 @@ module Classification
     # returns { 'table_name' => [values] }
     def get_items(options)
       query, data = {}, {}
-      options.each do |table, keys|
-        data[table] = {}
-        query[table] = {
+      options.each do |category, keys|
+        data[category] = {}
+        query[category_table(category)] = {
           'Keys' => [*keys].map do |key|
             {
               'HashKeyElement'  => { 'S' => @username },
@@ -39,16 +39,20 @@ module Classification
         }
       end
 
+      query
+      @connection.batch_get_item(query).body
+
       # flatten result
       @connection.batch_get_item(query).body['Responses'].each do |table, table_data|
-        data[table] = table_data['Items']
+        category = table.split('.').last
+        data[category] = table_data['Items']
       end
       data
     rescue Excon::Errors::BadRequest => error
       if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
         data
       elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
-        @logger.warn("Read capacity error for #{table}")
+        @logger.warn("Read capacity error for #{category_table(category)}")
         sleep(1)
         retry
       else
@@ -60,19 +64,23 @@ module Classification
     # options should be in form { 'table_name' => { 'token' => count } }
     # returns - true?
     def update_token_counts(options)
-      options.each do |table, tokens|
+      options.each do |category, tokens|
         # update total tokens for this category
-        update_token_count(Classification::TOTAL_TABLE, table, tokens.values.reduce(:+))
+        update_token_count(category_table('__TOTAL__'), "__#{category}__", tokens.values.reduce(:+))
         tokens.each do |token, count|
           # update token for this category
-          update_token_count(table, token, count)
+          update_token_count(category_table(category), token, count)
           # update token for all categories
-          update_token_count(Classification::TOTAL_TABLE, token, count)
+          update_token_count(category_table('__TOTAL__'), token, count)
         end
       end
     end
 
     private
+
+    def category_table(category)
+      ['classification', ENV['RACK_ENV'], category].join('.')
+    end
 
     def update_token_count(table, token, count)
       @connection.update_item(
@@ -95,15 +103,15 @@ module Classification
           { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
         )
 
-        unless table == Classification::TOTAL_TABLE
+        unless table == category_table('__TOTAL__')
           # add category to list in TOTAL_TABLE
           @connection.update_item(
-            Classification::TOTAL_TABLE,
+            category_table('__TOTAL__'),
             {
               'HashKeyElement'  => { 'S' => @username },
-              'RangeKeyElement' => { 'S' => Classification::TOTAL_KEY }
+              'RangeKeyElement' => { 'S' => '__META__' }
             },
-            { Classification::CATEGORIES_KEY => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
+            { '__CATEGORIES__'=> { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
           )
         end
 
