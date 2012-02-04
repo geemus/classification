@@ -59,57 +59,65 @@ module Classification
     # update a set of items in ddb
     # options should be in form { 'table_name' => { 'token' => count } }
     # returns - true?
-    # TODO: also update TOTAL_TABLE[token][count]
     def update_token_counts(options)
-      options.each do |table, items|
-        items.each do |token, count|
-          begin
-            @connection.update_item(
-              table,
-              {
-                'HashKeyElement'  => { 'S' => @username },
-                'RangeKeyElement' => { 'S' => token }
-              },
-              { 'count' => { 'Value' => { 'N' => count.to_s }, 'Action' => 'ADD' } }
-            )
-          rescue Excon::Errors::BadRequest => error
-            if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
-              # table does not exist, so create it
-              @connection.create_table(
-                table,
-                {
-                  'HashKeyElement'  => { 'AttributeName' => 'user',  'AttributeType' => 'S' },
-                  'RangeKeyElement' => { 'AttributeName' => 'token', 'AttributeType' => 'S' }
-                },
-                { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
-              )
-
-              unless table == Classification::TOTAL_TABLE
-                # add category to list in TOTAL_TABLE
-                @connection.update_item(
-                  Classification::TOTAL_TABLE,
-                  {
-                    'HashKeyElement'  => { 'S' => @username },
-                    'RangeKeyElement' => { 'S' => Classification::TOTAL_KEY }
-                  },
-                  { Classification::CATEGORIES_KEY => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
-                )
-              end
-
-              # wait for table to be ready
-              Fog.wait_for { @connection.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
-
-              # everything should now be ready to retry and add the tokens
-              retry
-            elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
-              logger.warn("Write capacity error for #{table}")
-              sleep(1)
-              retry
-            else
-              raise(error)
-            end
-          end
+      options.each do |table, tokens|
+        # update total tokens for this category
+        update_token_count(Classification::TOTAL_TABLE, table, tokens.values.reduce(:+))
+        tokens.each do |token, count|
+          # update token for this category
+          update_token_count(table, token, count)
+          # update token for all categories
+          update_token_count(Classification::TOTAL_TABLE, token, count)
         end
+      end
+    end
+
+    private
+
+    def update_token_count(table, token, count)
+      @connection.update_item(
+        table,
+        {
+          'HashKeyElement'  => { 'S' => @username },
+          'RangeKeyElement' => { 'S' => token }
+        },
+        { 'count' => { 'Value' => { 'N' => count.to_s }, 'Action' => 'ADD' } }
+      )
+    rescue Excon::Errors::BadRequest => error
+      if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
+        # table does not exist, so create it
+        @connection.create_table(
+          table,
+          {
+            'HashKeyElement'  => { 'AttributeName' => 'user',  'AttributeType' => 'S' },
+            'RangeKeyElement' => { 'AttributeName' => 'token', 'AttributeType' => 'S' }
+          },
+          { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
+        )
+
+        unless table == Classification::TOTAL_TABLE
+          # add category to list in TOTAL_TABLE
+          @connection.update_item(
+            Classification::TOTAL_TABLE,
+            {
+              'HashKeyElement'  => { 'S' => @username },
+              'RangeKeyElement' => { 'S' => Classification::TOTAL_KEY }
+            },
+            { Classification::CATEGORIES_KEY => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
+          )
+        end
+
+        # wait for table to be ready
+        Fog.wait_for { @connection.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
+
+        # everything should now be ready to retry and add the tokens
+        retry
+      elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
+        logger.warn("Write capacity error for #{table}")
+        sleep(1)
+        retry
+      else
+        raise(error)
       end
     end
 

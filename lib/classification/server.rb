@@ -84,7 +84,6 @@ module Classification
 
       # atomically update each token's count
       ddb.update_token_counts({
-        Classification::TOTAL_TABLE => { category => tokens.values.reduce(:+) },
         table => tokens
       })
 
@@ -101,7 +100,9 @@ module Classification
     end
 
     def get_probability(category, tokens)
-      category_total = get_category_tokens(Classification::TOTAL_TABLE, category)[category] || 0
+      table = table_for_category(category)
+
+      category_total = get_category_tokens(Classification::TOTAL_TABLE, table)[table] || 0.0
       # TODO: should read total count for a particular token across all categories for a single user
       # total_total == category_total currently, and should be a read for a particular token across all categories
       #total_total = get_category_tokens(TOTAL_TABLE, TOTAL)[TOTAL]
