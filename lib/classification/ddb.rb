@@ -1,7 +1,7 @@
 module Classification
   class DDB
 
-    attr_accessor :logger, :username
+    attr_accessor :connection, :logger, :username
 
     def initialize(options={})
       @connection = Fog::AWS::DynamoDB.new(

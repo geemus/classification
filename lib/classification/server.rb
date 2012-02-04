@@ -13,7 +13,7 @@ module Classification
 
     # get a list of categories
     get('/categories') do
-      categories = ddb2.get_categories
+      categories = ddb.get_categories
       status(200)
       body(categories.to_json)
     end
@@ -22,7 +22,7 @@ module Classification
     post('/categories') do
       tokens = JSON.parse(request.body.read)
 
-      categories = ddb2.get_categories
+      categories = ddb.get_categories
 
       probabilities = {}
       categories.each do |category|
@@ -40,10 +40,10 @@ module Classification
 
         # TODO: this should query and delete keys for this user ONLY
         # request delete
-        ddb.delete_table(table)
+        ddb.connection.delete_table(table)
 
         # remove category from list in TOTAL_TABLE
-        ddb.update_item(
+        ddb.connection.update_item(
           Classification::TOTAL_TABLE,
           {
             'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
@@ -53,7 +53,7 @@ module Classification
         )
 
         # wait for delete to finish
-        Fog.wait_for { !ddb.list_tables.body['TableNames'].include?(table) }
+        Fog.wait_for { !ddb.connection.list_tables.body['TableNames'].include?(table) }
 
       rescue Excon::Errors::BadRequest => error
         if error.response.body =~ /Requested resource not found/
@@ -98,10 +98,6 @@ module Classification
     private
 
     def ddb
-      ddb2.instance_variable_get(:@connection)
-    end
-
-    def ddb2
       Classification::DDB.new(
         :logger   => logger,
         :username => env['REMOTE_USER']
@@ -155,7 +151,7 @@ module Classification
     end
 
     def get_category_tokens(table, tokens)
-      token_data = ddb2.get_items(table, tokens)
+      token_data = ddb.get_items(table => tokens)[table]
 
       category_tokens = Hash.new(0.0)
       token_data.each do |item|
@@ -167,7 +163,7 @@ module Classification
 
     def increment_token_count(table, token, value)
       begin
-        ddb.update_item(
+        ddb.connection.update_item(
           table,
           {
             'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
@@ -178,7 +174,7 @@ module Classification
       rescue Excon::Errors::BadRequest => error
         if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
           # table does not exist, so create it
-          ddb.create_table(
+          ddb.connection.create_table(
             table,
             {
               'HashKeyElement'  => { 'AttributeName' => 'user',  'AttributeType' => 'S' },
@@ -189,7 +185,7 @@ module Classification
 
           unless table == Classification::TOTAL_TABLE
             # add category to list in TOTAL_TABLE
-            ddb.update_item(
+            ddb.connection.update_item(
               Classification::TOTAL_TABLE,
               {
                 'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
@@ -200,7 +196,7 @@ module Classification
           end
 
           # wait for table to be ready
-          Fog.wait_for { ddb.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
+          Fog.wait_for { ddb.connection.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
 
           # everything should now be ready to retry and add the tokens
           retry
