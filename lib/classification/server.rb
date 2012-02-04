@@ -38,7 +38,6 @@ module Classification
       begin
         table = table_for_category(category)
 
-        # TODO: this should query and delete keys for this user ONLY
         # request delete
         ddb.connection.delete_table(table)
 
@@ -47,9 +46,9 @@ module Classification
           Classification::TOTAL_TABLE,
           {
             'HashKeyElement'  => { 'S' => env['REMOTE_USER'] },
-            'RangeKeyElement' => { 'S' => Classification::TOTAL }
+            'RangeKeyElement' => { 'S' => Classification::TOTAL_KEY }
           },
-          { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'DELETE' } }
+          { Classification::CATEGORIES_KEY => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'DELETE' } }
         )
 
         # wait for delete to finish

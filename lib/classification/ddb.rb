@@ -14,9 +14,9 @@ module Classification
 
     # gets a list of all categories for a user
     def get_categories
-      categories_data = self.get_items(Classification::TOTAL_TABLE => Classification::TOTAL)[Classification::TOTAL_TABLE]
-      categories = if categories_data.first && categories_data.first['categories']
-        categories_data.first['categories']['SS']
+      categories_data = self.get_items(Classification::TOTAL_TABLE => Classification::TOTAL_KEY)[Classification::TOTAL_TABLE]
+      categories = if categories_data.first && categories_data.first[Classification::CATEGORIES_KEY]
+        categories_data.first[Classification::CATEGORIES_KEY]['SS']
       else
         []
       end
@@ -59,7 +59,6 @@ module Classification
     # update a set of items in ddb
     # options should be in form { 'table_name' => { 'token' => count } }
     # returns - true?
-    # TODO: store categories list in META_TABLE
     # TODO: also update TOTAL_TABLE[token][count]
     def update_token_counts(options)
       options.each do |table, items|
@@ -91,9 +90,9 @@ module Classification
                   Classification::TOTAL_TABLE,
                   {
                     'HashKeyElement'  => { 'S' => @username },
-                    'RangeKeyElement' => { 'S' => Classification::TOTAL }
+                    'RangeKeyElement' => { 'S' => Classification::TOTAL_KEY }
                   },
-                  { 'categories' => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
+                  { Classification::CATEGORIES_KEY => { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
                 )
               end
 
