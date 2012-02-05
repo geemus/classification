@@ -97,12 +97,10 @@ module Classification
     end
 
     def get_probability(category, tokens)
-      category_total = get_category_tokens('__TOTAL__', "__#{category}__")["__#{category}__"] || 0.0
-      # TODO: should read total count for a particular token across all categories for a single user
-      # total_total == category_total currently, and should be a read for a particular token across all categories
-      #total_total = get_category_tokens(TOTAL_TABLE, TOTAL)[TOTAL]
-
-      category_tokens = get_category_tokens(category, tokens.keys)
+      token_counts = ddb.get_token_counts(category, tokens)
+      category_tokens = token_counts[category]
+      category_total  = token_counts['__TOTAL__']["__#{category}__"]
+      total_tokens    = token_counts['__TOTAL__']
 
       assumed = 0.5
       if category_total == 0
@@ -111,10 +109,7 @@ module Classification
         probability = 1.0
         tokens.each do |token, count|
           conditional = category_tokens[token] / category_total
-          # TODO: total_total should represent times this token appears in all categories (ie batch get with multiple tables), not a total items count
-          # TODO: in the mean time, total_total can == category_total since there is only one category
-          #weighted = (total_total * conditional + assumed) / (total_total + 1)
-          weighted = (category_tokens[token] * conditional + assumed) / (category_tokens[token] + 1)
+          weighted = (total_tokens[token] * conditional + assumed) / (total_tokens[token] + 1)
           count.times do
             probability *= weighted
           end
@@ -140,17 +135,6 @@ module Classification
 
       sum = 0.0 if sum.nan?
       [sum, 1.0].min
-    end
-
-    def get_category_tokens(category, tokens)
-      token_data = ddb.get_items(category => tokens)[category]
-
-      category_tokens = Hash.new(0.0)
-      token_data.each do |item|
-        category_tokens[item['token']['S']] = item['count']['N'].to_f
-      end
-
-      category_tokens
     end
 
   end

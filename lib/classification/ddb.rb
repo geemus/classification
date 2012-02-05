@@ -14,7 +14,7 @@ module Classification
 
     # gets a list of all categories for a user
     def get_categories
-      categories_data = self.get_items('__TOTAL__' => '__META__')['__TOTAL__']
+      categories_data = get_items('__TOTAL__' => '__META__')['__TOTAL__']
       categories = if categories_data.first && categories_data.first['__CATEGORIES__']
         categories_data.first['__CATEGORIES__']['SS']
       else
@@ -22,7 +22,44 @@ module Classification
       end
     end
 
-    # TODO: this should be private
+    # get a set of token counts for category and total from ddb
+    # returns { 'token' => { '__TOTAL__' => total_count, category => category_count } }
+    def get_token_counts(category, tokens)
+      tokens_keys = tokens.keys
+      raw_data = get_items(category => tokens_keys, '__TOTAL__' => tokens_keys + ["__#{category}__"])
+
+      category_tokens = Hash.new(0.0)
+      raw_data[category].each do |item|
+        category_tokens[item['token']['S']] = item['count']['N'].to_f
+      end
+
+      total_tokens = Hash.new(0.0)
+      raw_data['__TOTAL__'].each do |item|
+        total_tokens[item['token']['S']] = item['count']['N'].to_f
+      end
+
+      { category => category_tokens, '__TOTAL__' => total_tokens }
+    end
+
+    # update a set of tokens for the category corpus in ddb
+    # returns - true?
+    def update_token_counts(category, tokens)
+      # update total tokens for this category
+      update_token_count(category_table('__TOTAL__'), "__#{category}__", tokens.values.reduce(:+))
+      tokens.each do |token, count|
+        # update token for this category
+        update_token_count(category_table(category), token, count)
+        # update token for all categories
+        update_token_count(category_table('__TOTAL__'), token, count)
+      end
+    end
+
+    private
+
+    def category_table(category)
+      ['classification', ENV['RACK_ENV'], category].join('.')
+    end
+
     # gets a set of items from ddb
     # options should be in form { 'table_name' => [keys] }
     # returns { 'table_name' => [values] }
@@ -65,26 +102,6 @@ module Classification
       else
         raise(error)
       end
-    end
-
-    # update a set of items in ddb
-    # options should be in form { 'table_name' => { 'token' => count } }
-    # returns - true?
-    def update_token_counts(category, tokens)
-      # update total tokens for this category
-      update_token_count(category_table('__TOTAL__'), "__#{category}__", tokens.values.reduce(:+))
-      tokens.each do |token, count|
-        # update token for this category
-        update_token_count(category_table(category), token, count)
-        # update token for all categories
-        update_token_count(category_table('__TOTAL__'), token, count)
-      end
-    end
-
-    private
-
-    def category_table(category)
-      ['classification', ENV['RACK_ENV'], category].join('.')
     end
 
     def update_token_count(table, token, count)

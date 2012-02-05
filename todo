@@ -1,6 +1,3 @@
-push table string building down into ddb
-  then change update_token_counts to use "__#{category}__" or something similar, instead of the table name
-
 delete should query/delete keys for a particular user only (currently deletes everybodies tokens by destroying tables)
 
 dynamodb operations (especially delete/put) should be queue/worker based
