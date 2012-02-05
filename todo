@@ -3,9 +3,6 @@ push table string building down into ddb
 
 delete should query/delete keys for a particular user only (currently deletes everybodies tokens by destroying tables)
 
-post /categories/category
-  batch_get_item in lookups should paginate if unproccessed items is non-empty
-
 dynamodb operations (especially delete/put) should be queue/worker based
 
 ? change heroku-app to have x-staging and x-production for parity with hud

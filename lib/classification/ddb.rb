@@ -22,13 +22,14 @@ module Classification
       end
     end
 
+    # TODO: this should be private
     # gets a set of items from ddb
     # options should be in form { 'table_name' => [keys] }
     # returns { 'table_name' => [values] }
     def get_items(options)
-      query, data = {}, {}
+      data, query = {}, {}, {}
       options.each do |category, keys|
-        data[category] = {}
+        data[category] = []
         query[category_table(category)] = {
           'Keys' => [*keys].map do |key|
             {
@@ -39,14 +40,20 @@ module Classification
         }
       end
 
-      query
-      @connection.batch_get_item(query).body
-
-      # flatten result
-      @connection.batch_get_item(query).body['Responses'].each do |table, table_data|
-        category = table.split('.').last
-        data[category] = table_data['Items']
+      # loop until UnproccessedKeys is empty
+      all_keys_processed = false
+      until all_keys_processed
+        response_body = @connection.batch_get_item(query).body
+        response_body['Responses'].each do |table, table_data|
+          data[table.split('.').last].concat(table_data['Items'])
+        end
+        if response_body['UnprocessedKeys'] == {}
+          all_keys_processed = true
+        else
+          query = response_body['UnprocessedKeys']
+        end
       end
+
       data
     rescue Excon::Errors::BadRequest => error
       if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
