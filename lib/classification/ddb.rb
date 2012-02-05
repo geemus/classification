@@ -80,28 +80,31 @@ module Classification
       # loop until UnproccessedKeys is empty
       all_keys_processed = false
       until all_keys_processed
-        response_body = @connection.batch_get_item(query).body
-        response_body['Responses'].each do |table, table_data|
-          data[table.split('.').last].concat(table_data['Items'])
-        end
-        if response_body['UnprocessedKeys'] == {}
-          all_keys_processed = true
-        else
-          query = response_body['UnprocessedKeys']
+        begin
+          response_body = @connection.batch_get_item(query).body
+          response_body['Responses'].each do |table, table_data|
+            data[table.split('.').last].concat(table_data['Items'])
+          end
+          if response_body['UnprocessedKeys'] == {}
+            all_keys_processed = true
+          else
+            query = response_body['UnprocessedKeys']
+          end
+        rescue Excon::Errors::BadRequest => error
+          if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
+            # table doesn't exist, we can disregard and return empty data set
+            all_keys_processed = true
+          elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
+            @logger.warn("Read capacity error for #{category_table(category)}")
+            sleep(1)
+            retry
+          else
+            raise(error)
+          end
         end
       end
 
       data
-    rescue Excon::Errors::BadRequest => error
-      if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
-        data
-      elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
-        @logger.warn("Read capacity error for #{category_table(category)}")
-        sleep(1)
-        retry
-      else
-        raise(error)
-      end
     end
 
     def update_token_count(table, token, count)
