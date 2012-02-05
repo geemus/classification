@@ -82,9 +82,7 @@ module Classification
       tokens = JSON.parse(request.body.read)
 
       # atomically update each token's count
-      ddb.update_token_counts({
-        category => tokens
-      })
+      ddb.update_token_counts(category, tokens)
 
       status(204)
     end

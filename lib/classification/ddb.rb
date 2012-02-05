@@ -63,16 +63,14 @@ module Classification
     # update a set of items in ddb
     # options should be in form { 'table_name' => { 'token' => count } }
     # returns - true?
-    def update_token_counts(options)
-      options.each do |category, tokens|
-        # update total tokens for this category
-        update_token_count(category_table('__TOTAL__'), "__#{category}__", tokens.values.reduce(:+))
-        tokens.each do |token, count|
-          # update token for this category
-          update_token_count(category_table(category), token, count)
-          # update token for all categories
-          update_token_count(category_table('__TOTAL__'), token, count)
-        end
+    def update_token_counts(category, tokens)
+      # update total tokens for this category
+      update_token_count(category_table('__TOTAL__'), "__#{category}__", tokens.values.reduce(:+))
+      tokens.each do |token, count|
+        # update token for this category
+        update_token_count(category_table(category), token, count)
+        # update token for all categories
+        update_token_count(category_table('__TOTAL__'), token, count)
       end
     end
 
