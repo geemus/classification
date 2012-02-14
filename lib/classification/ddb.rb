@@ -95,7 +95,7 @@ module Classification
             # table doesn't exist, we can disregard and return empty data set
             all_keys_processed = true
           elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
-            @logger.warn("Read capacity error for #{category_table(category)}")
+            @logger.warn("Read capacity error for #{query.keys}")
             sleep(1)
             retry
           else
