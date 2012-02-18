@@ -1,7 +1,9 @@
+dynamodb operations (especially delete/put) should be queue/worker based
+
+speed things up by caching an sts key (instead of getting a new one for EVERY request)
+
 ? provide for 'stats' or the like that will return overall total and totals per category
 
 delete should query/delete keys for a particular user only (currently deletes everybodies tokens by destroying tables)
-
-dynamodb operations (especially delete/put) should be queue/worker based
 
 ? change heroku-app to have x-staging and x-production for parity with hud
