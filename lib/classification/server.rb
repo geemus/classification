@@ -110,9 +110,7 @@ module Classification
         tokens.each do |token, count|
           conditional = category_tokens[token] / category_total
           weighted = (total_tokens[token] * conditional + assumed) / (total_tokens[token] + 1)
-          count.times do
-            probability *= weighted
-          end
+          probability *= weighted
         end
 
         # fisher
