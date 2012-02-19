@@ -101,4 +101,11 @@ class ClassificationServerTests < Test::Unit::TestCase
     delete('/categories/category')
   end
 
+  def test_match_without_data
+    response = post('/categories/category', {'token' => 1}.to_json)
+
+    assert_equal({'category' => 0.5}, JSON.parse(response.body))
+    assert_equal(200, response.status)
+  end
+
 end
