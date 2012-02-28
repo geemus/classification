@@ -1,10 +1,6 @@
 module Classification
   class Server < Sinatra::Base
 
-    configure :development, :test do
-      enable :dump_error
-    end
-
     enable :logging
 
     use Rack::Auth::Basic do |username, password|
