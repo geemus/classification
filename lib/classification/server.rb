@@ -98,14 +98,14 @@ module Classification
       category_total  = token_counts['__TOTAL__']["__#{category}__"]
       total_tokens    = token_counts['__TOTAL__']
 
-      assumed = 0.5
+      assumed, weight = 0.5, 0.25
       if category_total == 0
         probability = assumed
       else
         probability = 1.0
         tokens.each do |token, count|
           conditional = category_tokens[token] / category_total
-          weighted = (total_tokens[token] * conditional + assumed) / (total_tokens[token] + 1)
+          weighted = ((total_tokens[token] * conditional) + (assumed * weight)) / (total_tokens[token] + weight)
           probability *= weighted
         end
 

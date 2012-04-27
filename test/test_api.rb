@@ -85,7 +85,7 @@ class ClassificationServerTests < Test::Unit::TestCase
     put('/categories/category', {'token' => 1}.to_json)
     response = post('/categories', {'token' => 1}.to_json)
 
-    assert_equal({'category' => 0.9657615543388357}, JSON.parse(response.body))
+    assert_equal({'category' => 0.9948244640920437}, JSON.parse(response.body))
     assert_equal(200, response.status)
 
     delete('/categories/category')
@@ -95,7 +95,7 @@ class ClassificationServerTests < Test::Unit::TestCase
     put('/categories/category', {'token' => 1}.to_json)
     response = post('/categories/category', {'token' => 1}.to_json)
 
-    assert_equal({'category' => 0.9657615543388357}, JSON.parse(response.body))
+    assert_equal({'category' => 0.9948244640920437}, JSON.parse(response.body))
     assert_equal(200, response.status)
 
     delete('/categories/category')
