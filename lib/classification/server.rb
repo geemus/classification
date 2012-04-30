@@ -98,33 +98,36 @@ module Classification
       category_total  = token_counts['__TOTAL__']["__#{category}__"]
       total_tokens    = token_counts['__TOTAL__']
 
-      assumed, weight = 0.5, 0.25
-      if category_total == 0
-        probability = assumed
-      else
-        probability = 1.0
-        tokens.each do |token, count|
+      assumed, probability, weight = 0.5, 1.0, 0.25
+
+      tokens.each do |token, count|
+        weighted = if category_total == 0
+          assumed
+        else
           conditional = category_tokens[token] / category_total
-          weighted = ((total_tokens[token] * conditional) + (assumed * weight)) / (total_tokens[token] + weight)
+          ((total_tokens[token] * conditional) + (assumed * weight)) / (total_tokens[token] + weight)
+        end
+        count.times do
           probability *= weighted
         end
-
-        # fisher
-        probability = -2.0 * Math.log(probability)
-
-        # inv chi
-        m = probability / 2.0
-        sum = term = Math.exp(-m)
-        1.upto(tokens.length) do |i|
-          term *= m / i
-          sum += term
-        end
-
-        sum = 0.0 if sum.nan?
-        probability = [sum, 1.0].min
       end
 
-      probability
+      # fisher
+      probability = -2.0 * Math.log(probability)
+
+      # inv chi
+      m = probability / 2.0
+      sum = term = Math.exp(-m)
+      1.upto(tokens.length) do |i|
+        term *= m / i
+        sum += term
+      end
+
+      if sum.nan?
+        0.0
+      else
+        [sum, 1.0].min
+      end
     end
 
   end

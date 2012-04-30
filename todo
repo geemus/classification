@@ -1,6 +1,5 @@
-dynamodb put should use batch_put_item
-
 dynamodb operations (especially delete/put) should be queue/worker based
+  ? queue_classic
 
 speed things up by caching an sts key (instead of getting a new one for EVERY request)
 
