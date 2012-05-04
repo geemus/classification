@@ -1,5 +1,6 @@
 require 'fog'
 require 'json'
+require 'queue_classic'
 require 'sinatra/base'
 
 __LIB_DIR__ = File.expand_path(File.join(File.dirname(__FILE__)))
@@ -10,5 +11,12 @@ end
 require 'classification/ddb'
 require 'classification/server'
 
-module Classification
+ENVIRONMENT = ENV['RACK_ENV'] || 'development'
+DATABASE = "classification_{ENVIRONMENT}"
+DATABASE_URL = ENV["DATABASE_URL"] || "postgres://localhost/#{DATABASE}"
+
+module Classification; end
+
+def QC.enqueue(function_call, *args)
+  eval("#{function_call} *#{args.inspect}")
 end

@@ -1,6 +1,12 @@
+require 'rubygems'
+require 'bundler/setup'
+
 require 'rake/testtask'
 
 require './lib/classification'
+
+require 'queue_classic'
+
 
 Rake::TestTask.new do |task|
   task.name = :default
@@ -18,4 +24,31 @@ task('db:nuke', [:environment]) do |task, args|
   end
   Fog.wait_for { !ddb.list_tables.body['TableNames'].any? {|table| tables_to_delete.include?(table)} }
   printf("done\n")
+end
+
+namespace :jobs do
+  desc "Alias for qc:work"
+  task :work  => "qc:work"
+end
+
+namespace :qc do
+  desc "Start a new worker for the (default or $QUEUE) queue"
+  task :work do
+    QC::Worker.new.start
+  end
+
+  desc "Returns the number of jobs in the (default or QUEUE) queue"
+  task :count do
+    puts QC::Worker.new.queue.count
+  end
+
+  desc "Setup queue_classic tables and funtions in database"
+  task :create do
+    QC::Setup.create
+  end
+
+  desc "Remove queue_classic tables and functions from database."
+  task :drop do
+    QC::Setup.drop
+  end
 end

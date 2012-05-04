@@ -3,6 +3,23 @@ module Classification
 
     attr_accessor :connection, :logger, :username
 
+    # update a set of tokens for the category corpus in ddb
+    # returns - true?
+    def self.update_token_counts(username, category, tokens)
+      connection = Fog::AWS::DynamoDB.new(
+        :aws_access_key_id      => ENV['AWS_ACCESS_KEY_ID'],
+        :aws_secret_access_key  => ENV['AWS_SECRET_ACCESS_KEY']
+      )
+      # update total tokens for this category
+      update_token_count(connection, username, category_table('__TOTAL__'), "__#{category}__", tokens.values.reduce(:+))
+      tokens.each do |token, count|
+        # update token for this category
+        update_token_count(connection, username, category_table(category), token, count)
+        # update token for all categories
+        update_token_count(connection, username, category_table('__TOTAL__'), token, count)
+      end
+    end
+
     def initialize(options={})
       @connection = Fog::AWS::DynamoDB.new(
         :aws_access_key_id      => ENV['AWS_ACCESS_KEY_ID'],
@@ -41,23 +58,61 @@ module Classification
       { category => category_tokens, '__TOTAL__' => total_tokens }
     end
 
-    # update a set of tokens for the category corpus in ddb
-    # returns - true?
-    def update_token_counts(category, tokens)
-      # update total tokens for this category
-      update_token_count(category_table('__TOTAL__'), "__#{category}__", tokens.values.reduce(:+))
-      tokens.each do |token, count|
-        # update token for this category
-        update_token_count(category_table(category), token, count)
-        # update token for all categories
-        update_token_count(category_table('__TOTAL__'), token, count)
+    private
+
+    def self.category_table(category)
+      ['classification', ENV['RACK_ENV'], category].join('.')
+    end
+
+    def self.update_token_count(connection, username, table, token, count)
+      connection.update_item(
+        table,
+        {
+          'HashKeyElement'  => { 'S' => username },
+          'RangeKeyElement' => { 'S' => token }
+        },
+        { 'count' => { 'Value' => { 'N' => count.to_s }, 'Action' => 'ADD' } }
+      )
+    rescue Excon::Errors::BadRequest => error
+      if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
+        # table does not exist, so create it
+        connection.create_table(
+          table,
+          {
+            'HashKeyElement'  => { 'AttributeName' => 'user',  'AttributeType' => 'S' },
+            'RangeKeyElement' => { 'AttributeName' => 'token', 'AttributeType' => 'S' }
+          },
+          { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
+        )
+
+        unless table == category_table('__TOTAL__')
+          # add category to list in TOTAL_TABLE
+          connection.update_item(
+            category_table('__TOTAL__'),
+            {
+              'HashKeyElement'  => { 'S' => username },
+              'RangeKeyElement' => { 'S' => '__META__' }
+            },
+            { '__CATEGORIES__'=> { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
+          )
+        end
+
+        # wait for table to be ready
+        Fog.wait_for { connection.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
+
+        # everything should now be ready to retry and add the tokens
+        retry
+      elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
+        puts("Write capacity error for #{table}")
+        sleep(1)
+        retry
+      else
+        raise(error)
       end
     end
 
-    private
-
     def category_table(category)
-      ['classification', ENV['RACK_ENV'], category].join('.')
+      self.class.category_table(category)
     end
 
     # gets a set of items from ddb
@@ -105,53 +160,6 @@ module Classification
       end
 
       data
-    end
-
-    def update_token_count(table, token, count)
-      @connection.update_item(
-        table,
-        {
-          'HashKeyElement'  => { 'S' => @username },
-          'RangeKeyElement' => { 'S' => token }
-        },
-        { 'count' => { 'Value' => { 'N' => count.to_s }, 'Action' => 'ADD' } }
-      )
-    rescue Excon::Errors::BadRequest => error
-      if error.respond_to?(:response) && error.response.body =~ /Requested resource not found/
-        # table does not exist, so create it
-        @connection.create_table(
-          table,
-          {
-            'HashKeyElement'  => { 'AttributeName' => 'user',  'AttributeType' => 'S' },
-            'RangeKeyElement' => { 'AttributeName' => 'token', 'AttributeType' => 'S' }
-          },
-          { 'ReadCapacityUnits' => 10, 'WriteCapacityUnits' => 5 }
-        )
-
-        unless table == category_table('__TOTAL__')
-          # add category to list in TOTAL_TABLE
-          @connection.update_item(
-            category_table('__TOTAL__'),
-            {
-              'HashKeyElement'  => { 'S' => @username },
-              'RangeKeyElement' => { 'S' => '__META__' }
-            },
-            { '__CATEGORIES__'=> { 'Value' => { 'SS' => [table.split('.').last] }, 'Action' => 'ADD' } }
-          )
-        end
-
-        # wait for table to be ready
-        Fog.wait_for { @connection.describe_table(table).body['Table']['TableStatus'] == 'ACTIVE' }
-
-        # everything should now be ready to retry and add the tokens
-        retry
-      elsif error.respond_to?(:response) && error.response.body =~ /ProvisionedThroughputExceededException/
-        logger.warn("Write capacity error for #{table}")
-        sleep(1)
-        retry
-      else
-        raise(error)
-      end
     end
 
   end
