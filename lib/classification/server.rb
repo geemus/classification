@@ -77,7 +77,7 @@ module Classification
     put('/categories/:category') do |category|
       tokens = JSON.parse(request.body.read)
 
-      # atomically update each token's count
+      # atomically update each token's count (happens asynchronously)
       QC.enqueue("Classification::DDB.update_token_counts", env['REMOTE_USER'], category, tokens)
 
       status(204)

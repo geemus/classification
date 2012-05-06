@@ -4,6 +4,11 @@ require './lib/classification'
 require 'test/unit'
 require 'rack/test'
 
+# use QueueClassic in synchronous mode for tests
+def QC.enqueue(function_call, *args)
+  eval("#{function_call} *#{args.inspect}")
+end
+
 class ClassificationServerTests < Test::Unit::TestCase
   include Rack::Test::Methods
 

@@ -16,7 +16,3 @@ DATABASE = "classification_{ENVIRONMENT}"
 DATABASE_URL = ENV["DATABASE_URL"] || "postgres://localhost/#{DATABASE}"
 
 module Classification; end
-
-def QC.enqueue(function_call, *args)
-  eval("#{function_call} *#{args.inspect}")
-end
