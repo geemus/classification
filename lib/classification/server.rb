@@ -100,33 +100,34 @@ module Classification
 
       assumed, probability, weight = 0.5, 1.0, 0.25
 
-      tokens.each do |token, count|
-        weighted = if category_total == 0
-          assumed
-        else
-          conditional = category_tokens[token] / category_total
-          ((total_tokens[token] * conditional) + (assumed * weight)) / (total_tokens[token] + weight)
-        end
-        count.times do
-          probability *= weighted
-        end
-      end
-
-      # fisher
-      probability = -2.0 * Math.log(probability)
-
-      # inv chi
-      m = probability / 2.0
-      sum = term = Math.exp(-m)
-      1.upto(tokens.length) do |i|
-        term *= m / i
-        sum += term
-      end
-
-      if sum.nan?
-        0.0
+      if category_total == 0
+        assumed
       else
-        [sum, 1.0].min
+        tokens.each do |token, count|
+          conditional = category_tokens[token] / category_total
+          weighted = ((total_tokens[token] * conditional) + (assumed * weight)) / (total_tokens[token] + weight)
+
+          count.times do
+            probability *= weighted
+          end
+        end
+
+        # fisher
+        probability = -2.0 * Math.log(probability)
+
+        # inv chi
+        m = probability / 2.0
+        sum = term = Math.exp(-m)
+        1.upto(tokens.length) do |i|
+          term *= m / i
+          sum += term
+        end
+
+        if sum.nan?
+          0.0
+        else
+          [sum, 1.0].min
+        end
       end
     end
 
