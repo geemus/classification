@@ -6,6 +6,7 @@ module Classification
     # update a set of tokens for the category corpus in ddb
     # returns - true?
     def self.update_token_counts(username, category, tokens)
+      puts("DDB.update_token_counts('#{username}', '#{category}', #{tokens.inspect})")
       connection = Fog::AWS::DynamoDB.new(
         :aws_access_key_id      => ENV['AWS_ACCESS_KEY_ID'],
         :aws_secret_access_key  => ENV['AWS_SECRET_ACCESS_KEY']
