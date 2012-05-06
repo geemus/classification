@@ -26,11 +26,6 @@ task('db:nuke', [:environment]) do |task, args|
   printf("done\n")
 end
 
-namespace :jobs do
-  desc "Alias for qc:work"
-  task :work  => "qc:work"
-end
-
 namespace :qc do
   desc "Start a new worker for the (default or $QUEUE) queue"
   task :work do
