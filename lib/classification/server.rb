@@ -102,7 +102,7 @@ module Classification
 
       assumed, probability, weight = 0.5, 1.0, 0.25
 
-      if category_total == 0
+      if total_tokens == 0
         assumed
       else
         tokens.each do |token, count|
