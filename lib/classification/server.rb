@@ -1,3 +1,5 @@
+# encoding: utf-8
+
 module Classification
   class Server < Sinatra::Base
 

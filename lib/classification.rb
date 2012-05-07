@@ -1,3 +1,5 @@
+# encoding: utf-8
+
 require 'fog'
 require 'json'
 require 'queue_classic'
