@@ -6,7 +6,7 @@ module Classification
     enable :logging
 
     use Rack::Auth::Basic do |username, password|
-      password == '25cf3e8f7e5adea77e023ffba89e203b1c0c33eb'
+      password == ENV['PASSWORD']
     end
 
     # get a list of categories
